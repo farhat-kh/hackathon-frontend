@@ -10,17 +10,20 @@ import * as cocossd from '@tensorflow-models/coco-ssd';
 // Import de la gestion localStorage
 import { savePrediction } from './utils/storage';
 
+// Import de l'historique
+import History from './History';
+
 function App() {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
-  const [lastSaveTime, setLastSaveTime] = useState(0); // Pour contrôler la fréquence d'enregistrement
+  const [lastSaveTime, setLastSaveTime] = useState(0); 
 
   const runCoco = async () => {
     console.log("Chargement du modèle COCO-SSD...");
     const net = await cocossd.load();
     setInterval(() => {
       detect(net);
-    }, 500); // Détecter toutes les 500ms, mais sauvegarder moins souvent
+    }, 500); 
   };
 
   const detect = async (net) => {
@@ -77,7 +80,7 @@ function App() {
 
   return (
     <div className="App">
-      <header className="App-header" style={{ position: 'relative' }}>
+      <header className="App-header" style={{ position: 'relative', width: "640px", height: "480px", margin: "auto" }}>
         <Webcam
           ref={webcamRef}
           muted={true}
@@ -101,8 +104,6 @@ function App() {
             position: "absolute",
             top: 0,
             left: 0,
-            right: 0,
-            bottom: 0,
             margin: "auto",
             textAlign: "center",
             zIndex: 9,
@@ -111,6 +112,7 @@ function App() {
           }}
         />
       </header>
+      <History />
     </div>
   );
 }
