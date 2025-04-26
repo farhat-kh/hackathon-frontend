@@ -1,35 +1,118 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React, { useRef, useEffect, useState } from 'react';
+import './App.css';
+import Webcam from 'react-webcam';
+import { drawRect } from './utilities';
+
+// Import du modèle TensorFlow
+import * as tf from '@tensorflow/tfjs';
+import * as cocossd from '@tensorflow-models/coco-ssd';
+
+// Import de la gestion localStorage
+import { savePrediction } from './utils/storage';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const webcamRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [lastSaveTime, setLastSaveTime] = useState(0); // Pour contrôler la fréquence d'enregistrement
+
+  const runCoco = async () => {
+    console.log("Chargement du modèle COCO-SSD...");
+    const net = await cocossd.load();
+    setInterval(() => {
+      detect(net);
+    }, 500); // Détecter toutes les 500ms, mais sauvegarder moins souvent
+  };
+
+  const detect = async (net) => {
+    if (
+      typeof webcamRef.current !== "undefined" &&
+      webcamRef.current !== null &&
+      webcamRef.current.video.readyState === 4
+    ) {
+      const video = webcamRef.current.video;
+      const videoWidth = webcamRef.current.video.videoWidth;
+      const videoHeight = webcamRef.current.video.videoHeight;
+
+      webcamRef.current.width = videoWidth;
+      webcamRef.current.height = videoHeight;
+      canvasRef.current.width = videoWidth;
+      canvasRef.current.height = videoHeight;
+
+      const obj = await net.detect(video);
+      const ctx = canvasRef.current.getContext("2d");
+      drawRect(obj, ctx);
+
+      if (obj.length > 0) {
+        const now = Date.now();
+        if (now - lastSaveTime > 5000) { 
+          const imageSrc = webcamRef.current.getScreenshot();
+          const label = obj[0].class;
+          const date = new Date().toLocaleString();
+
+          const prediction = {
+            image: imageSrc,
+            label: label,
+            date: date,
+          };
+
+          console.log("Prediction sauvegardée :", prediction);
+          savePrediction(prediction);
+          setLastSaveTime(now); 
+        }
+      }
+    }
+  };
+
+  useEffect(() => { runCoco(); }, []);
+
+  useEffect(() => {
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(() => {
+        console.log('Permission webcam accordée.');
+      })
+      .catch((err) => {
+        console.error('Erreur webcam :', err);
+      });
+  }, []);
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div className="App">
+      <header className="App-header" style={{ position: 'relative' }}>
+        <Webcam
+          ref={webcamRef}
+          muted={true}
+          screenshotFormat="image/jpeg"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            margin: "auto",
+            textAlign: "center",
+            zIndex: 8,
+            width: 640,
+            height: 480,
+          }}
+        />
+        <canvas
+          ref={canvasRef}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            margin: "auto",
+            textAlign: "center",
+            zIndex: 9,
+            width: 640,
+            height: 480,
+          }}
+        />
+      </header>
+    </div>
+  );
 }
 
-export default App
+export default App;
